@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# 放置位置：内核树的 drivers/htfg/Kconfig
+
+config HTFG
+	bool "HTFG kernel-side channel"
+	default y
+	help
+	  Minimal kernel-side channel used by the HTFG UI data reader.
+
+	  Step 1 only provides a magic prctl() entry point that returns a
+	  constant: it reads no memory and touches no kernel data structure,
+	  so it cannot affect normal operation.
+
+	  If unsure, say N.
