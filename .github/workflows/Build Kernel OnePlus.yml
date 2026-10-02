@@ -1146,27 +1146,37 @@ jobs:
           cd kernel_workspace/kernel_platform/common
           echo "注入目录: $(pwd)"
 
-          # 1) 驱动源码 + 共享头文件
-          mkdir -p drivers/htfg
-          cp -f "$GITHUB_WORKSPACE/htfg/htfg.c"   drivers/htfg/htfg.c
-          cp -f "$GITHUB_WORKSPACE/htfg/Kconfig"  drivers/htfg/Kconfig
-          cp -f "$GITHUB_WORKSPACE/htfg/Makefile" drivers/htfg/Makefile
-          cp -f "$GITHUB_WORKSPACE/htfg/htfg.h"   include/linux/htfg.h
+          # 1) 下载驱动源码 + 共享头文件
+          HTFG_RAW="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_REF_NAME}/htfg"
+          SRC="/tmp/htfg-src"
+          echo "HTFG 源: ${HTFG_RAW}"
+          mkdir -p "$SRC"
+          for f in htfg.c htfg.h Kconfig Makefile patch_sysc.py; do
+            curl -fsSL --retry 3 "$HTFG_RAW/$f" -o "$SRC/$f"
+          done
+          ls -l "$SRC"
 
-          # 2) 挂进构建树（照抄本仓库 Apply RE_KERNEL 步骤的写法；带守卫，防重复执行）
+          # 2) 放入内核树
+          mkdir -p drivers/htfg
+          cp -f "$SRC/htfg.c"   drivers/htfg/htfg.c
+          cp -f "$SRC/Kconfig"  drivers/htfg/Kconfig
+          cp -f "$SRC/Makefile" drivers/htfg/Makefile
+          cp -f "$SRC/htfg.h"   include/linux/htfg.h
+
+          # 3) 挂进构建树（照抄本仓库 Apply RE_KERNEL 步骤的写法；带守卫，防重复执行）
           grep -q 'drivers/htfg/Kconfig' drivers/Kconfig || \
             sed -i '/endmenu/i source "drivers/htfg/Kconfig"' drivers/Kconfig
           grep -q 'drivers/htfg/' drivers/Makefile || \
             sed -i '$a obj-$(CONFIG_HTFG) += htfg/' drivers/Makefile
 
-          # 3) 打开配置（写进 gki_defconfig，后面 `make gki_defconfig` 会带上）
+          # 4) 打开配置（写进 gki_defconfig，后面 `make gki_defconfig` 会带上）
           grep -q '^CONFIG_HTFG=y' arch/arm64/configs/gki_defconfig || \
             echo 'CONFIG_HTFG=y' >> arch/arm64/configs/gki_defconfig
 
-          # 4) 给 prctl 装钩子（锚点匹配不到会非零退出，让构建红掉）
-          python3 "$GITHUB_WORKSPACE/htfg/patch_sysc.py" kernel/sys.c
+          # 5) 给 prctl 装钩子（锚点匹配不到会非零退出，让构建红掉）
+          python3 "$SRC/patch_sysc.py" kernel/sys.c
 
-          # 5) 自检：任何一项没打上，立刻让构建失败，避免刷进一个没有钩子的内核
+          # 6) 自检：任何一项没打上，立刻让构建失败，避免刷进一个没有钩子的内核
           grep -q 'htfg_prctl'           kernel/sys.c
           grep -q 'drivers/htfg/Kconfig' drivers/Kconfig
           grep -q 'drivers/htfg/'        drivers/Makefile
@@ -1190,7 +1200,6 @@ jobs:
             echo "❌ System.map 里没有 htfg_prctl —— 代码没有真正编进 Image"
             exit 1
           fi
-
       - name: Custom BUILD_TIME
         if: ${{ github.event.inputs.BUILD_TIME != '-1' }}
         shell: bash
