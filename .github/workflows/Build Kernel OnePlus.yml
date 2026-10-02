@@ -1166,7 +1166,7 @@ jobs:
           # 3) 挂进构建树（照抄本仓库 Apply RE_KERNEL 步骤的写法；带守卫，防重复执行）
           grep -q 'drivers/htfg/Kconfig' drivers/Kconfig || \
             sed -i '/endmenu/i source "drivers/htfg/Kconfig"' drivers/Kconfig
-          grep -q 'drivers/htfg/' drivers/Makefile || \
+          grep -qF 'obj-$(CONFIG_HTFG) += htfg/' drivers/Makefile || \
             sed -i '$a obj-$(CONFIG_HTFG) += htfg/' drivers/Makefile
 
           # 4) 打开配置（写进 gki_defconfig，后面 `make gki_defconfig` 会带上）
@@ -1176,11 +1176,11 @@ jobs:
           # 5) 给 prctl 装钩子（锚点匹配不到会非零退出，让构建红掉）
           python3 "$SRC/patch_sysc.py" kernel/sys.c
 
-          # 6) 自检：任何一项没打上，立刻让构建失败，避免刷进一个没有钩子的内核
-          grep -q 'htfg_prctl'           kernel/sys.c
-          grep -q 'drivers/htfg/Kconfig' drivers/Kconfig
-          grep -q 'drivers/htfg/'        drivers/Makefile
-          grep -q '^CONFIG_HTFG=y'       arch/arm64/configs/gki_defconfig
+          # 6) 自检：任何一项没打上，立刻让构建失败（带标签，日志里能直接看到是哪一项）
+          grep -q  'htfg_prctl'                   kernel/sys.c                     || { echo "❌ 自检失败: kernel/sys.c 未装钩子";           exit 1; }
+          grep -q  'drivers/htfg/Kconfig'         drivers/Kconfig                  || { echo "❌ 自检失败: drivers/Kconfig 未挂载";           exit 1; }
+          grep -qF 'obj-$(CONFIG_HTFG) += htfg/'  drivers/Makefile                 || { echo "❌ 自检失败: drivers/Makefile 未挂载";          exit 1; }
+          grep -q  '^CONFIG_HTFG=y'               arch/arm64/configs/gki_defconfig || { echo "❌ 自检失败: gki_defconfig 未开启 CONFIG_HTFG"; exit 1; }
           ls -l drivers/htfg/ include/linux/htfg.h
           echo "✅ HTFG 驱动已注入"
 
