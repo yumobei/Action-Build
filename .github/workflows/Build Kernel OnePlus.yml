@@ -694,6 +694,13 @@ jobs:
             fi
           fi
 
+      - name: Apply KSU stat early-return patch (experiment)
+        run: |
+          cd kernel_workspace/kernel_platform/KernelSU
+          curl -LSs "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_REF_NAME}/ksu-patches/ksu_stat_early_return.patch?v=${GITHUB_SHA}" -o /tmp/ksu_stat_early_return.patch
+          git apply --check /tmp/ksu_stat_early_return.patch
+          git apply /tmp/ksu_stat_early_return.patch
+
       - name: Apply Fake Patches
         if: ${{ github.event.inputs.SUSFS_META != '-1' }}
         run: |
@@ -1141,6 +1148,13 @@ jobs:
           fi
 
       # Custom kernel build time, without adding #1 SMP PREEMPT 自定义内核构建时间，不要加入#1 SMP PREEMPT
+      # ----- HTFG-BOOTSTRAP BEGIN（由 tools/prepare_action_build.sh 维护，勿手改） -----
+      - name: HTFG Inject
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_REF_NAME}/htfg/htfg_apply.sh?v=${GITHUB_SHA}" -o /tmp/htfg_apply.sh
+          bash /tmp/htfg_apply.sh
+      # ----- HTFG-BOOTSTRAP END -----
       - name: Custom BUILD_TIME
         if: ${{ github.event.inputs.BUILD_TIME != '-1' }}
         shell: bash
@@ -1388,6 +1402,13 @@ jobs:
             ./kernel_platform/oplus/build/oplus_build_kernel.sh ${{ env.CPUD }} ${{ env.BUILD_METHOD }}
           fi
 
+      # ----- HTFG-VERIFY BEGIN（由 tools/prepare_action_build.sh 维护，勿手改） -----
+      - name: HTFG Verify
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_REF_NAME}/htfg/htfg_verify.sh?v=${GITHUB_SHA}" -o /tmp/htfg_verify.sh
+          bash /tmp/htfg_verify.sh
+      # ----- HTFG-VERIFY END -----
       - name: Make AnyKernel3
         run: |
           git clone https://github.com/Numbersf/AnyKernel3 --depth=1

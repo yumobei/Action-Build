@@ -1,0 +1,47 @@
+diff --git a/kernel/hook/syscall_hook_manager.c b/kernel/hook/syscall_hook_manager.c
+index 5dd1f2b..af757f8 100644
+--- a/kernel/hook/syscall_hook_manager.c
++++ b/kernel/hook/syscall_hook_manager.c
+@@ -12,11 +12,13 @@
+ #include <linux/sched/task_stack.h>
+ #endif
+ #include <linux/compat.h>
++#include <linux/cred.h>
+ 
+ #include "compat/syscall_no.h"
+ 
+ #include "arch.h"
+ #include "klog.h" // IWYU pragma: keep
++#include "policy/allowlist.h"
+ #include "hook/syscall_hook_manager.h"
+ #include "hook/tp_marker.h"
+ #include "feature/sucompat.h"
+@@ -124,6 +126,16 @@ static void ksu_sys_enter_handler(void *data, struct pt_regs *regs, long id)
+     if (ksu_has_syscall_hook(id)) {
+         struct pt_regs *current_regs = task_pt_regs(current);
+ 
++        /*
++         * newfstatat/faccessat are pure sucompat hooks: their handlers
++         * already fall back to the original syscall for non-allowlisted
++         * callers. Returning here skips the dispatcher and the second
++         * syscall dispatch without changing the result.
++         */
++        if ((id == __NR_newfstatat || id == __NR_faccessat) &&
++            !ksu_is_allow_uid_for_current(ksu_get_uid_t(current_uid())))
++            return;
++
+ #if defined(__x86_64__)
+         // Stash the original syscall number in ax.
+         // We use ax because it currently just holds -ENOSYS and is safe to overwrite.
+@@ -147,6 +159,11 @@ aarch64_compat:
+     if (ksu_has_compat_syscall_hook(id)) {
+         struct pt_regs *current_regs = task_pt_regs(current);
+ 
++        if ((id == ksu_get_compat_syscall_no(fstatat64) ||
++             id == ksu_get_compat_syscall_no(faccessat)) &&
++            !ksu_is_allow_uid_for_current(ksu_get_uid_t(current_uid())))
++            return;
++
+         /* arm32 syscall numbers are passed in r7, not arm64 x8. */
+         PT_REGS_ORIG_SYSCALL(current_regs) = (u32)id;
+         current_regs->syscallno = ksu_compat_dispatcher_nr;
