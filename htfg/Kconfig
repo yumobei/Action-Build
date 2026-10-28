@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# 放置位置：内核树的 drivers/htfg/Kconfig
+
+config HTFG
+	bool "HTFG kernel-side channel"
+	default y
+	help
+	  Minimal kernel-side channel used by the HTFG UI data reader.
+
+	  Provides a magic prctl() entry point: a scalar ping (step 1) plus
+	  three read-only primitives (step 2) -- read a range of another
+	  process's memory, find a main-process pid by package name, and
+	  enumerate a process's VMAs.  Caller identity is either a small
+	  tool identity whitelist (uid 0/2000 -- root/shell CLI use only;
+	  never an app uid) or APK signing-certificate fingerprint
+	  pinning: the SHA-256 of the first certificate in the caller's
+	  installed base.apk v2 signing block must match a compiled-in
+	  fingerprint (any package name; the signing key is the
+	  credential).  This is pinning, not full APK signature
+	  verification: it relies on PackageManager's install-time
+	  verification and on installed APKs under /data/app being
+	  immutable.
+
+	  Step 5 adds TOUCH_DEV / TOUCH_SEND (op 5/6): query the touchscreen
+	  input device and inject touch events into its input-core pipeline
+	  (the only side-effect primitive; it writes no process memory and
+	  no files).
+
+	  If unsure, say N.
