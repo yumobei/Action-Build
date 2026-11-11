@@ -9,8 +9,8 @@
 #
 # What it does (after the official HTFG injection has already run):
 #   1) locate the kernel tree (same logic as htg/htfg_apply.sh);
-#   2) download the four test-driver files from htg/screen_test/ on the same
-#      branch (raw URL, ?v=${GITHUB_SHA} to defeat CDN caching);
+#   2) download the four test-driver files from htg/screen_test/, with the raw
+#      URL pinned to the commit SHA (the branch form can hit a stale CDN cache);
 #   3) copy them to drivers/htfg_screen_test/;
 #   4) hook drivers/Kconfig, drivers/Makefile and gki_defconfig;
 #   5) count self-check: every hook must appear exactly once, otherwise the
@@ -25,7 +25,9 @@ if [ -z "${GITHUB_SHA:-}" ]; then
     exit 1
 fi
 
-RAW="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_REF_NAME}/htfg/screen_test"
+# Pin raw URLs to the commit SHA, not the branch name: the branch form can be
+# served from a stale CDN cache (including a cached 404 from before the push).
+RAW="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/htfg/screen_test"
 REV="${GITHUB_SHA}"
 
 # ---- 0) enter the kernel tree (workflow step cwd is $GITHUB_WORKSPACE) ----
@@ -43,10 +45,24 @@ echo "HTFG screen-test: tree=$(pwd) rev=${REV:0:12}"
 SRC="/tmp/htfg-screen-test-src"
 rm -rf "$SRC"
 mkdir -p "$SRC"
+
+fetch_file() {  # $1 = file name, $2 = output path
+    if curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 \
+            "$RAW/$1" -o "$2"; then
+        return 0
+    fi
+    # Fallback host: GitHub API (different cache path), raw media type.
+    echo "WARN: raw download failed for $1, trying GitHub API"
+    curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 \
+        -H 'Accept: application/vnd.github.raw' \
+        "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/htfg/screen_test/$1?ref=${REV}" \
+        -o "$2"
+}
+
 for f in htg_screen_test.c htg_screen_test.h Kconfig Makefile; do
-    curl -fsSL --retry 3 "$RAW/$f?v=$REV" -o "$SRC/$f"
-    if [ ! -s "$SRC/$f" ]; then
+    if ! fetch_file "$f" "$SRC/$f" || [ ! -s "$SRC/$f" ]; then
         echo "ERROR: HTFG screen-test: download failed or empty: $f"
+        echo "       url: $RAW/$f"
         exit 1
     fi
 done

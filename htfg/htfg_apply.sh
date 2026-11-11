@@ -226,6 +226,13 @@ echo "✅ HTFG 驱动已注入（rev ${REV:0:12}）"
 # The official HTFG injection above is unchanged; this appended block only
 # downloads and runs htg/screen_test/test_htfg_apply.sh from the same branch.
 # ============================================================================
-TRAW="${RAW}/screen_test"
-curl -fsSL --retry 3 "${TRAW}/test_htfg_apply.sh?v=${REV}" -o /tmp/htfg_screen_apply.sh
+TRAW="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${REV}/htfg/screen_test"
+if ! curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 \
+        "${TRAW}/test_htfg_apply.sh" -o /tmp/htfg_screen_apply.sh; then
+    echo "WARN: HTFG screen-test: raw download failed, trying GitHub API"
+    curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 \
+        -H 'Accept: application/vnd.github.raw' \
+        "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/htfg/screen_test/test_htfg_apply.sh?ref=${REV}" \
+        -o /tmp/htfg_screen_apply.sh
+fi
 bash /tmp/htfg_screen_apply.sh
