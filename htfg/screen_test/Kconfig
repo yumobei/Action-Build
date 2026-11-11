@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# HTFG_Kernel_Original_Screenshot Stage 2A test driver.
+# TEST-ONLY: this option must never be enabled in a shipping kernel.
+
+config HTFG_SCREEN_TEST
+	bool "HTFG Stage 2 screen capture test driver (test kernels only)"
+	depends on DRM && DEBUG_FS && KALLSYMS_ALL
+	default y
+	help
+	  Independent built-in test driver for the HTFG screenshot feasibility
+	  project.  It reaches the vendor mediatek-drm CWB/WDMA helpers through
+	  kallsyms_lookup_name(), replaces the stock 128-wide CWB buffers with
+	  full-screen MTK GEM framebuffers, and exposes a root-only debugfs node
+	  for capture/read.
+
+	  This is a prototype scaffold, not the final HTFG interface.  It does
+	  not include HTFG headers, does not register a prctl operation and must
+	  not be shipped.
