@@ -4,4 +4,4 @@
 # This Makefile is copied into drivers/htfg_screen_test/Makefile by
 # test_htfg_apply.sh; it is not the HTFG driver Makefile.
 
-obj-$(CONFIG_HTFG_SCREEN_TEST) += htg_screen_test.o
+obj-$(CONFIG_HTFG_SCREEN_TEST) += htfg_screen_test.o
