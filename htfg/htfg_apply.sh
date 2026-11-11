@@ -225,11 +225,8 @@ echo "✅ HTFG 驱动已注入（rev ${REV:0:12}）"
 # Stage 2A test driver injection (TEMPORARY TEST BRANCH ONLY).
 #
 # The four driver files are EMBEDDED below on purpose: CI makes no additional
-# raw.githubusercontent.com request for them.  An earlier revision referenced
-# the wrong file names (htg_screen_test.*), which produced the 404s seen in
-# the first two CI runs; the sources are embedded so the only download is the
-# workflow's own htf/htfg_apply.sh fetch, and the names cannot drift again.
-# The official HTFG injection above is unchanged.
+# raw.githubusercontent.com request for them.  The official HTFG injection
+# above is unchanged.
 # ============================================================================
 SRC=/tmp/htfg-screen-test-src
 rm -rf "$SRC"
@@ -348,6 +345,25 @@ static struct completion htg_copy_done;
 static struct dentry *htg_dentry;
 
 /*
+ * DRM_FORMAT_RGB888 stores 24-bit little-endian R:G:B, so the vendor CWB
+ * writes B,G,R in memory while PPM expects R,G,B.  Swap in place once, in
+ * the completion callback, before userspace can read the frame; readers
+ * then get byte-exact data with any read size.  A later capture overwrites
+ * the buffer with fresh vendor bytes before the next swap.
+ */
+static void htg_swap_rb(u8 *buf, size_t len)
+{
+	size_t i;
+	u8 t;
+
+	for (i = 0; i + 2 < len; i += 3) {
+		t = buf[i];
+		buf[i] = buf[i + 2];
+		buf[i + 2] = t;
+	}
+}
+
+/*
  * Called by the vendor monitor thread after mtk_drm_cwb_copy_buf() finished.
  * Do NOT annotate with __nocfi: this function is the callee of a CFI-checked
  * indirect call from mediatek-drm.ko and must carry the canonical type
@@ -359,6 +375,7 @@ static void htg_screen_copy_done(void *buffer, enum CWB_BUFFER_TYPE type)
 		return;
 	if (buffer != READ_ONCE(htg.ppm))
 		return;
+	htg_swap_rb(htg.ppm, htg.ppm_len);
 	WRITE_ONCE(htg.waiting, false);
 	complete(&htg_copy_done);
 }
